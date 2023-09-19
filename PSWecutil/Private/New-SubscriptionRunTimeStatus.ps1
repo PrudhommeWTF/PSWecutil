@@ -1,36 +1,29 @@
 function New-SubscriptionRunTimeStatus {
-
     [CmdletBinding()]
     [OutputType(
         [PSCustomObject]
     )]
-
-    param (
+    Param(
         [Parameter(
             Mandatory = $true
         )]
-        [Array]
-        $StringArray
+        [Array]$StringArray
     )
 
-    $startLine = 1
-    $endLine = ($StringArray |
-        Select-String -Pattern ":" -NotMatch |
-            Select-Object -ExpandProperty LineNumber -First 1 -Skip 1) - 2
+    $StartLine = 1
+    $EndLine = ($StringArray | Select-String -Pattern ':' -NotMatch | Select-Object -ExpandProperty LineNumber -First 1 -Skip 1) - 2
     
-    $hashTable = [HashTable]::new()
-    ($StringArray[$startLine..$endLine]).ForEach({
-        $parts = $_ -split ":"
-        $hashTable.Add(
-            $parts[0].Trim(), $parts[1].Trim()
+    $HashTable = [HashTable]::new()
+    ($StringArray[$StartLine..$EndLine]).ForEach({
+        $Parts = $_ -split ':'
+        $HashTable.Add(
+            $Parts[0].Trim(), $Parts[1].Trim()
         )
     })
 
-    $output = [PSCustomObject]$hashTable
+    $Output = [PSCustomObject]$HashTable
 
-    $output.PSObject.TypeNames.Insert(
-        0, "PSWecutil.SubscriptionRunTimeStatus"
-    )
+    $Output.PSObject.TypeNames.Insert( 0, 'PSWecutil.SubscriptionRunTimeStatus')
 
-    Write-Output -InputObject $output
+    Write-Output -InputObject $Output
 }

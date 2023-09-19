@@ -1,91 +1,51 @@
 using module ..\PSWecutil.classes.psm1
 
 function New-Subscription {
-
     [CmdletBinding()]
     [OutputType(
         [Subscription]
     )]
-
-    param (
+    Param(
         [Parameter(
             Mandatory = $true
         )]
-        [Alias(
-            "SubscriptionName"
-        )]
-        [String]
-        $SubscriptionId,
+        [Alias("SubscriptionName")]
+        [String]$SubscriptionId,
 
         [Parameter(
             Mandatory = $true
         )]
-        [ValidateSet(
-            "CollectorInitiated", "SourceInitiated"
-        )]
-        [System.String]
-        $SubscriptionType,
+        [ValidateSet("CollectorInitiated", "SourceInitiated")]
+        [System.String]$SubscriptionType,
 
-        [Parameter()]
-        [String]
-        $Description,
+        [String]$Description,
 
-        [Parameter()]
-        [Bool]
-        $Enabled = $true,
+        [Bool]$Enabled = $true,
 
-        [Parameter()]
-        [ValidateSet(
-            "Push", "Pull"
-        )]
-        [String]
-        $DeliveryMode = "Push",
+        [ValidateSet("Push", "Pull")]
+        [String]$DeliveryMode = "Push",
 
-        [Parameter()]
-        [Int]
-        $MaxItems = 1,
+        [Int]$MaxItems = 1,
 
-        [Parameter()]
-        [Int]
-        $MaxLatencyTime = 20000,
+        [Int]$MaxLatencyTime = 20000,
 
-        [Parameter()]
-        [Int]
-        $HeartbeatInterval = 20000,
+        [Int]$HeartbeatInterval = 20000,
 
-        [Parameter()]
-        [Bool]
-        $ReadExistingEvents = $false,
+        [Bool]$ReadExistingEvents = $false,
 
-        [Parameter()]
-        [ValidateSet(
-            "Http", "Https"
-        )]
-        [String]
-        $TransportName = "Http",
+        [ValidateSet("Http", "Https")]
+        [String]$TransportName = "Http",
 
-        [Parameter()]
-        [Int]
-        $TransportPort = 5985,
+        [Int]$TransportPort = 5985,
 
-        [Parameter()]
-        [String]
-        $ContentFormat = "RenderedText",
+        [String]$ContentFormat = "RenderedText",
 
-        [Parameter()]
-        [String]
-        $Locale = "en-US",
+        [String]$Locale = "en-US",
 
-        [Parameter()]
-        [String]
-        $LogFile = "ForwardedEvents",
+        [String]$LogFile = "ForwardedEvents",
 
-        [Parameter()]
-        [ValidateSet(
-            "Default", "Basic", "Negotiate", "Digest"
-        )]
-        [String]
-        $CredentialsType = "Default"
+        [ValidateSet("Default", "Basic", "Negotiate", "Digest")]
+        [String]$CredentialsType = "Default"
     )
 
     [Xml]$xml = Get-Content -Path $PSScriptRoot\..\bin\Subscription.Template.xml

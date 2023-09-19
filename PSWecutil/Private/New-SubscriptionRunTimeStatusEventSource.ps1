@@ -5,46 +5,37 @@ function New-SubscriptionRunTimeStatusEventSource {
         [PSCustomObject]
     )]
 
-    param (
+    Param(
         [Parameter(
             Mandatory = $true
         )]
-        [Array]
-        $StringArray
+        [Array]$StringArray
     )
 
-    $startLine = ($StringArray |
-        Select-String ":" -NotMatch |
-            Select-Object -ExpandProperty LineNumber -First 1 -Skip 1) - 1
-    $endLine = ($StringArray |
-        Select-String ":" -NotMatch |
-            Select-Object -ExpandProperty LineNumber -First 1 -Skip 2) - 2
-    if ($endLine -lt 0) {
-        $endLine = $StringArray.Count
+    $StartLine = ($StringArray | Select-String ':' -NotMatch | Select-Object -ExpandProperty LineNumber -First 1 -Skip 1) - 1
+    $EndLine = ($StringArray | Select-String ':' -NotMatch | Select-Object -ExpandProperty LineNumber -First 1 -Skip 2) - 2
+    if ($EndLine -lt 0) {
+        $EndLine = $StringArray.Count
     }
-    $range = $endLine - $startLine
+    $Range = $EndLine - $StartLine
 
-    $output = @()
-    for ($i = $startLine; $i -lt $StringArray.Count; $i += $range + 1) {
-        $hashTable = [HashTable]::new()
-        ($StringArray[$i..($i + $range)]).ForEach({
-            $parts = $_ -split ":"
-            if ($parts.Count -eq 1) {
-                $hashTable.Add(
-                    "EventSource", $parts[0].Trim()
-                )
+    $Output = @()
+    for ($i = $StartLine; $i -lt $StringArray.Count; $i += $Range + 1) {
+        $HashTable = [HashTable]::new()
+        ($StringArray[$i..($i + $Range)]).ForEach({
+            $Parts = $_ -split ':'
+            if ($Parts.Count -eq 1) {
+                $HashTable.Add('EventSource', $Parts[0].Trim())
             } else {
-                $hashTable.Add(
-                    $parts[0].Trim(), ($parts[1..$parts.count] -join ":").Trim()
+                $HashTable.Add(
+                    $Parts[0].Trim(), ($Parts[1..$Parts.count] -join ':').Trim()
                 )
             }
         })
 
-        $output += [PSCustomObject]$hashTable
+        $Output += [PSCustomObject]$HashTable
 
-        $output.PSObject.TypeNames.Insert(
-            0, "PSWecutil.SubscriptionRunTimeStatusEventSource"
-        )
+        $Output.PSObject.TypeNames.Insert(0, 'PSWecutil.SubscriptionRunTimeStatusEventSource')
     }
-    Write-Output -InputObject $output
+    Write-Output -InputObject $Output
 }

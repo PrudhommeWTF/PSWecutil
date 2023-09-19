@@ -1,23 +1,21 @@
 function Format-Xml {
-
     [CmdletBinding()]
     [OutputType()]
-
-    param (
-        [Parameter()]
-        [Xml]
-        $Xml
+    Param(
+        [Xml]$Xml
     )
 
-    $stringWriter = New-Object -TypeName System.IO.StringWriter
-    $xmlTextWriter = New-Object -TypeName System.Xml.XmlTextWriter $stringWriter -Property @{ Formatting = "Indented" }
+    $StringWriter = New-Object -TypeName 'System.IO.StringWriter'
+    $XmlTextWriter = New-Object -TypeName 'System.Xml.XmlTextWriter' $StringWriter -Property @{
+        Formatting = 'Indented'
+    }
 
     $Xml.WriteTo(
-        $xmlTextWriter
+        $XmlTextWriter
     )
 
-    $xmlTextWriter.Flush()
-    $stringWriter.Flush()
+    $XmlTextWriter.Flush()
+    $StringWriter.Flush()
 
     Write-Output $StringWriter.ToString();
 }

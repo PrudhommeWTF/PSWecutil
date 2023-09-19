@@ -1,79 +1,84 @@
 using module ..\PSWecutil.classes.psm1
 
 function Get-Subscription {
-
     [CmdletBinding()]
     [OutputType()]
-
-    param (
+    Param(
         [Parameter(
             ValueFromPipeline = $true,
             ValueFromPipelineByPropertyName = $true
         )]
-        [String[]]
-        $SubscriptionId = $null,
+        [String[]]$SubscriptionId = $null,
 
-        [Parameter()]
-        [Switch]
-        $AsXml,
+        [Switch]$AsXml,
 
-        [Parameter()]
-        [Alias(
-            "ComputerName"
-        )]
-        [String]
-        $Name = $env:COMPUTERNAME,
+        [String]$ComputerName = $env:COMPUTERNAME,
 
-        [Parameter()]
-        [PSCredential]
-        $Credential = [PSCredential]::Empty
+        [PSCredential]$Credential = [PSCredential]::Empty
     )
 
-    [ScriptBlock]$scriptBlock = {
-        $wecsvc = Get-Service -Name Wecsvc
-        if (-not ( $wecsvc.Status -eq "Running" )) {
-            throw "Service not running."
-        }
+    $ScriptBlock = [ScriptBlock]{
+        if ((Get-Service -Name Wecsvc).Status -eq 'Running') {
+            $Subscriptions = wecutil.exe enum-subscription
 
-        $subscriptions = wecutil.exe enum-subscription
-
-        if ($args.Count -eq 0) {
-            foreach ($subscription in $subscriptions) {
-                [Xml]$output = wecutil.exe get-subscription "$subscription" /format:XML
-
-                Write-Output -InputObject $output
-            }
-        } else {
-            foreach ($arg in $args) {
-                if ($arg -in $subscriptions) {
-                    [Xml]$output = wecutil.exe get-subscription $arg /format:XML
-
+            if ($args.Count -eq 0) {
+                foreach ($subscription in $Subscriptions) {
+                    [Xml]$output = wecutil.exe get-subscription "$subscription" /format:XML
+    
                     Write-Output -InputObject $output
-                } else {
-                    Write-Error "Subscription not found: '$arg'."
-                    continue
                 }
-            }
+            } else {
+                foreach ($arg in $args) {
+                    if ($arg -in $Subscriptions) {
+                        [Xml]$output = wecutil.exe get-subscription $arg /format:XML
+    
+                        Write-Output -InputObject $output
+                    } else {
+                        Write-Error "Subscription not found: '$arg'."
+                        continue
+                    }
+                }
+            }    
+        } else {
+            throw 'Service not running.'
         }
     }
 
-    $subscriptions = Invoke-Command -ComputerName $Name -ScriptBlock $scriptBlock -ArgumentList $SubscriptionId -Credential $Credential
+    $InvokeCommand101 = [Collections.Hashtable]@{
+        ScriptBlock = $ScriptBlock
+        ArgumentList = $SubscriptionId
+    }
+    if (!($ComputerName -eq $env:COMPUTERNAME)) {
+        try {
+            if (Get-PSSession | Where-Object -FilterScript {$_.ComputerName -eq $ComputerName -and $_.State -ne 'Broken'}) {
+                $Session = Get-PSSession -ComputerName $ComputerName -ErrorAction Stop
+            } else {
+                $Session = New-PSSession -ComputerName $ComputerName -Credential $Credential -ErrorAction Stop
+            }
+        }
+        catch {throw $_}
 
-    foreach ($subscription in $subscriptions) {
+        $InvokeCommand101.Add('Session', $Session)
+    }
+    $Subscriptions = Invoke-Command @InvokeCommand101
+
+    foreach ($subscription in $Subscriptions) {
         if ($null -ne $subscription) {
             if ($AsXml.IsPresent) {
-                $output = Format-Xml -Xml $subscription.InnerXml
+                $Output = Format-Xml -Xml $subscription.InnerXml
             } else {
-                $output = [Subscription]$subscription
+                $Output = [Subscription]$subscription
 
-                $output.PSObject.TypeNames.Insert(
-                    0, "PSWecutil.Subscription"
-                )
+                $Output.PSObject.TypeNames.Insert(0, 'PSWecutil.Subscription')
             }
 
-            Add-Member -InputObject $output -NotePropertyName PSComputerName -NotePropertyValue $Name
+            Add-Member -InputObject $Output -NotePropertyName PSComputerName -NotePropertyValue $ComputerName
             
-            Write-Output -InputObject $output
+            Write-Output -InputObject $Output
         }
+    }
+
+    if ($Session) {
+        Remove-PSSession -Session $Session
     }
 }

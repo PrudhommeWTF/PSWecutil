@@ -1,67 +1,73 @@
 function Get-SubscriptionRunTimeStatus {
-
     [CmdletBinding()]
     [OutputType()]
-
-    param (
+    Param(
         [Parameter(
             Mandatory = $true,
             ValueFromPipeline = $true,
             ValueFromPipelineByPropertyName = $true
         )]
-        [String[]]
-        $SubscriptionId,
+        [String[]]$SubscriptionId,
 
-        [Parameter()]
-        [String]
-        $EventSource,
+        [String]$EventSource,
 
-        [Parameter()]
-        [Alias(
-            "ComputerName"
-        )]
-        [String]
-        $Name = $env:COMPUTERNAME,
+        [String]$ComputerName = $env:COMPUTERNAME,
 
-        [Parameter()]
-        [PSCredential]
-        $Credential = [PSCredential]::Empty
+        [PSCredential]$Credential = [PSCredential]::Empty
     )
 
-    $scriptBlock = [ScriptBlock]{
-        $wecsvc = Get-Service -Name Wecsvc
-        if (-not ( $wecsvc.Status -eq "Running" )) {
-            throw "Service not running."
+    $ScriptBlock = [ScriptBlock]{
+        if ((Get-Service -Name Wecsvc).Status -eq 'Running') {
+            $Subscriptions = wecutil.exe enum-subscription
+
+            foreach ($arg in $args[0]) {
+                if ($arg -in $Subscriptions) {
+                    $Output = wecutil.exe get-subscriptionruntimestatus "$arg" "$($args[1])"
+    
+                    Write-Output -InputObject $Output
+                } else {
+                    Write-Error "Subscription not found: '$arg'."
+                    continue
+                }
+            }  
+        } else {
+            throw 'Service not running.'
         }
 
-        $subscriptions = wecutil.exe enum-subscription
+    }
 
-        foreach ($arg in $args[0]) {
-            if ($arg -in $subscriptions) {
-                $output = wecutil.exe get-subscriptionruntimestatus "$arg" "$($args[1])"
-
-                Write-Output -InputObject $output
+    $InvokeCommand101 = [Collections.Hashtable]@{
+        ScriptBlock = $ScriptBlock
+        ArgumentList = $SubscriptionId, $EventSource
+    }
+    if (!($ComputerName -eq $env:COMPUTERNAME)) {
+        try {
+            if (Get-PSSession | Where-Object -FilterScript {$_.ComputerName -eq $ComputerName -and $_.State -ne 'Broken'}) {
+                $Session = Get-PSSession -ComputerName $ComputerName -ErrorAction Stop
             } else {
-                Write-Error "Subscription not found: '$arg'."
-                continue
+                $Session = New-PSSession -ComputerName $ComputerName -Credential $Credential -ErrorAction Stop
             }
-        }  
+        }
+        catch {throw $_}
+
+        $InvokeCommand101.Add('Session', $Session)
     }
+    $SubscriptionRunTimeStatus = Invoke-Command @InvokeCommand101
 
-    $subscriptionRunTimeStatus = Invoke-Command -ComputerName $Name -ScriptBlock $scriptBlock -ArgumentList $SubscriptionId, $EventSource -Credential $Credential
-
-    $output = New-SubscriptionRuntimeStatus -StringArray $subscriptionRunTimeStatus
-    $eventSourceOutput = New-SubscriptionRuntimeStatusEventSource -StringArray $subscriptionRunTimeStatus
-    $outputProperties = $output |
-        Get-Member |
-            Select-Object -ExpandProperty Name
-    if ("EventSources" -notin $outputProperties) {
-        Add-Member -InputObject $output -NotePropertyName "EventSources" -NotePropertyValue $eventSourceOutput 
+    $Output = New-SubscriptionRuntimeStatus -StringArray $SubscriptionRunTimeStatus
+    $EventSourceOutput = New-SubscriptionRuntimeStatusEventSource -StringArray $SubscriptionRunTimeStatus
+    $OutputProperties = $output | Get-Member | Select-Object -ExpandProperty Name
+    if ('EventSources' -notin $outputProperties) {
+        Add-Member -InputObject $Output -NotePropertyName 'EventSources' -NotePropertyValue $eventSourceOutput 
     } else {
-        $output.EventSources = $eventSourceOutput
+        $Output.EventSources = $EventSourceOutput
     }
 
-    Add-Member -InputObject $output -NotePropertyName PSComputerName -NotePropertyValue $Name
+    Add-Member -InputObject $Output -NotePropertyName PSComputerName -NotePropertyValue $ComputerName
 
     Write-Output -InputObject $output
+
+    if ($Session) {
+        Remove-PSSession -Session $Session
+    }
 }

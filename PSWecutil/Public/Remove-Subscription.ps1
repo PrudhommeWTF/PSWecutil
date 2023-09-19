@@ -1,56 +1,68 @@
 function Remove-Subscription {
 
     [CmdletBinding(
-        ConfirmImpact = "High",
+        ConfirmImpact = 'High',
         SupportsShouldProcess = $true
     )]
     [OutputType(
         [Void]
     )]
 
-    param (
+    Param(
         [Parameter(
             Mandatory = $true,
             ValueFromPipeline = $true,
             ValueFromPipelineByPropertyName = $true
         )]
-        [String[]]
-        $SubscriptionId,
+        [String[]]$SubscriptionId,
 
-        [Parameter()]
-        [Alias(
-            "ComputerName"
-        )]
-        [String]
-        $Name = $env:COMPUTERNAME,
+        [String]$ComputerName = $env:COMPUTERNAME,
 
-        [Parameter()]
-        [PSCredential]
-        $Credential = [PSCredential]::Empty
+        [PSCredential]$Credential = [PSCredential]::Empty
     )
 
-    $scriptBlock = [ScriptBlock]{
-        $wecsvc = Get-Service -Name Wecsvc
-        if (-not ( $wecsvc.Status -eq "Running" )) {
-            throw "Service not running."
-        }
+    $ScriptBlock = [ScriptBlock]{
+        if ((Get-Service -Name Wecsvc).Status -eq 'Running' ) {
+            $Subscriptions = wecutil.exe enum-subscription
 
-        $subscriptions = wecutil.exe enum-subscription
-
-        foreach ($arg in $args) {
-            if ($arg -in $subscriptions) {
-                wecutil.exe delete-subscription "$arg"
-            } else {
-                Write-Error "Subscription not found: '$arg'."
-                continue
+            foreach ($arg in $args) {
+                if ($arg -in $Subscriptions) {
+                    wecutil.exe delete-subscription "$arg"
+                } else {
+                    Write-Error "Subscription not found: '$arg'."
+                    continue
+                }
             }
+    
+        } else {
+            throw 'Service not running.'
         }
     }
 
-    $shouldProcess = $PSCmdlet.ShouldProcess(
+    $ShouldProcess = $PSCmdlet.ShouldProcess(
         $SubscriptionId
     )
-    if ($shouldProcess) {
-        Invoke-Command -ScriptBlock $scriptBlock -ArgumentList $SubscriptionId -ComputerName $Name -Credential $Credential
+    if ($ShouldProcess) {
+        $InvokeCommand101 = [Collections.Hashtable]@{
+            ScriptBlock = $ScriptBlock
+            ArgumentList = $SubscriptionId
+        }
+        if (!($ComputerName -eq $env:COMPUTERNAME)) {
+            try {
+                if (Get-PSSession | Where-Object -FilterScript {$_.ComputerName -eq $ComputerName -and $_.State -ne 'Broken'}) {
+                    $Session = Get-PSSession -ComputerName $ComputerName -ErrorAction Stop
+                } else {
+                    $Session = New-PSSession -ComputerName $ComputerName -Credential $Credential -ErrorAction Stop
+                }
+            }
+            catch {throw $_}
+
+            $InvokeCommand101.Add('Session', $Session)
+        }
+        Invoke-Command @InvokeCommand101
+    }
+
+    if ($Session) {
+        Remove-PSSession -Session $Session
     }
 }

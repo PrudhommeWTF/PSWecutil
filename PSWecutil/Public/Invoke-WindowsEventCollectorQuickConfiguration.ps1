@@ -1,5 +1,4 @@
 function Invoke-WindowsEventCollectorQuickConfiguration {
-
     [CmdletBinding(
         ConfirmImpact = "High",
         SupportsShouldProcess = $true
@@ -7,28 +6,41 @@ function Invoke-WindowsEventCollectorQuickConfiguration {
     [OutputType(
         [Void]
     )]
+    Param(
+        [Switch]$Confirm,
 
-    param (
-        [Parameter()]
-        [Switch]
-        $Confirm,
+        [String]$ComputerName = $env:COMPUTERNAME,
 
-        [Parameter()]
-        [Alias(
-            "ComputerName"
-        )]
-        [String]
-        $Name = $env:COMPUTERNAME,
-
-        [Parameter()]
-        [PSCredential]
-        $Credential = [PSCredential]::Empty
+        [PSCredential]$Credential = [PSCredential]::Empty
     )
+    $ScriptBlock = [ScriptBlock]{
+        wecutil.exe quick-config /q:true
+    }
 
-    $shouldProcess = $PSCmdlet.ShouldProcess(
-        $Name
+    $ShouldProcess = $PSCmdlet.ShouldProcess(
+        $ComputerName
     )
-    if ($shouldProcess) {
-        Invoke-Command -ScriptBlock { wecutil.exe quick-config /q:true } -ComputerName $name -Credential $Credential
+    if ($ShouldProcess) {
+        $InvokeCommand101 = [Collections.Hashtable]@{
+            ScriptBlock = $ScriptBlock
+            ArgumentList = $SubscriptionId
+        }
+        if (!($ComputerName -eq $env:COMPUTERNAME)) {
+            try {
+                if (Get-PSSession | Where-Object -FilterScript {$_.ComputerName -eq $ComputerName -and $_.State -ne 'Broken'}) {
+                    $Session = Get-PSSession -ComputerName $ComputerName -ErrorAction Stop
+                } else {
+                    $Session = New-PSSession -ComputerName $ComputerName -Credential $Credential -ErrorAction Stop
+                }
+            }
+            catch {throw $_}
+        
+            $InvokeCommand101.Add('Session', $Session)
+        }
+        Invoke-Command @InvokeCommand101
+    }
+
+    if ($Session) {
+        Remove-PSSession -Session $Session
     }
 }
